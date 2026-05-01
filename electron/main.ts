@@ -32,7 +32,7 @@ function createWindow() {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
     win.webContents.openDevTools({ mode: "detach" });
   } else {
-    win.loadFile(path.join(__dirname, "..", "dist", "index.html"));
+    win.loadFile(path.join(__dirname, "..", "..", "dist", "index.html"));
   }
 
   win.on("closed", () => (win = null));

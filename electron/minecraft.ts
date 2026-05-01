@@ -1,13 +1,65 @@
 import { Client } from "minecraft-launcher-core";
 import { BrowserWindow } from "electron";
-import { profileDir, sharedMcDir } from "./paths";
+import * as fs from "fs";
+import * as path from "path";
+import { profileDir, rootDir, sharedMcDir } from "./paths";
 import { ensureLoader } from "./modloaders";
+import { ensureJavaRuntime, readRequiredJavaComponent } from "./java";
 import { syncProfileResources } from "./sync";
+
 import { IPC } from "../shared/ipc";
 import type { AuthAccount, LaunchProgress, ProfileManifest } from "../shared/types";
 
+/** Retire des chaînes les tokens d'authentification avant écriture sur disque. */
+function scrub(s: string): string {
+  return s
+    .replace(/(--accessToken\s+)\S+/g, "$1[REDACTED]")
+    .replace(/(--xuid\s+)\S+/g, "$1[REDACTED]")
+    .replace(/(--clientId\s+)\S+/g, "$1[REDACTED]");
+}
+
+/**
+ * Lit le version JSON d'un loader (NeoForge/Forge/Fabric) et retourne ses
+ * arguments JVM avec les placeholders résolus. MCLC v3.18 ne les applique pas
+ * correctement quand on utilise version.custom, donc on les passe via customArgs.
+ */
+function loaderJvmArgs(loaderVersionId: string, mcRoot: string): string[] {
+  const jsonPath = path.join(mcRoot, "versions", loaderVersionId, `${loaderVersionId}.json`);
+  if (!fs.existsSync(jsonPath)) return [];
+  let data: any;
+  try { data = JSON.parse(fs.readFileSync(jsonPath, "utf-8")); } catch { return []; }
+  const jvm = data?.arguments?.jvm;
+  if (!Array.isArray(jvm)) return [];
+
+  const libDir = path.join(mcRoot, "libraries");
+  const sep = process.platform === "win32" ? ";" : ":";
+  const subs: Record<string, string> = {
+    library_directory: libDir,
+    libraries_directory: libDir,
+    classpath_separator: sep,
+    version_name: loaderVersionId,
+    natives_directory: path.join(mcRoot, "natives", loaderVersionId)
+  };
+  const out: string[] = [];
+  for (const item of jvm) {
+    if (typeof item !== "string") continue;
+    let s = item;
+    for (const [k, v] of Object.entries(subs)) {
+      s = s.replace(new RegExp("\\$\\{" + k + "\\}", "g"), v);
+    }
+    out.push(s);
+  }
+  return out;
+}
+
 function send(win: BrowserWindow | null, p: LaunchProgress) {
   if (win && !win.isDestroyed()) win.webContents.send(IPC.EvtLaunchProgress, p);
+}
+
+function logFile() {
+  const dir = path.join(rootDir(), "logs");
+  fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, "latest.log");
 }
 
 export async function launchProfile(opts: {
@@ -18,50 +70,98 @@ export async function launchProfile(opts: {
 }) {
   const { profile, account, ramMb, win } = opts;
   const launcher = new Client();
+  const log = fs.createWriteStream(logFile(), { flags: "w" });
+  log.write(`=== Sectver Launcher — ${new Date().toISOString()} ===\n`);
+  log.write(`Profil: ${profile.id} | MC: ${profile.minecraftVersion} | Loader: ${profile.loader}\n\n`);
 
-  send(win, { stage: "loader", message: "Préparation du loader..." });
-  const versionId = await ensureLoader(profile);
+  let lastJavaLine = "";
 
-  send(win, { stage: "mods", message: "Synchronisation des ressources..." });
-  await syncProfileResources(profile, m => send(win, { stage: "mods", message: m }));
+  // On résout/rejette manuellement quand le process Java se termine.
+  let resolveExit!: () => void;
+  let rejectExit!: (e: Error) => void;
+  const exitPromise = new Promise<void>((res, rej) => { resolveExit = res; rejectExit = rej; });
 
-  send(win, { stage: "version", message: "Vérification des fichiers Minecraft..." });
+  try {
+    send(win, { stage: "loader", message: "Préparation du loader..." });
+    const versionId = await ensureLoader(profile);
+    log.write(`Version résolue: ${versionId}\n`);
 
-  const overrides: any = {
-    gameDirectory: profileDir(profile.id)
-  };
+    send(win, { stage: "version", message: "Vérification du JRE..." });
+    const javaComponent = readRequiredJavaComponent(profile.minecraftVersion) ?? "java-runtime-delta";
+    log.write(`Composant Java requis: ${javaComponent}\n`);
+    const javaPath = await ensureJavaRuntime(javaComponent, m => send(win, { stage: "version", message: m }));
+    log.write(`Java path: ${javaPath}\n`);
 
-  launcher.on("debug", (e: any) => send(win, { stage: "version", message: String(e) }));
-  launcher.on("data", (e: any) => send(win, { stage: "running", message: String(e).slice(0, 200) }));
-  launcher.on("progress", (e: any) => {
-    if (e?.type) {
-      const pct = e.total ? Math.round((e.task / e.total) * 100) : undefined;
-      send(win, { stage: "assets", message: `${e.type}…`, percent: pct });
-    }
-  });
-  launcher.on("close", () => send(win, { stage: "done", message: "Jeu fermé" }));
+    send(win, { stage: "mods", message: "Synchronisation des ressources..." });
+    await syncProfileResources(profile, m => send(win, { stage: "mods", message: m }));
 
-  send(win, { stage: "launching", message: "Lancement..." });
+    send(win, { stage: "version", message: "Vérification des fichiers Minecraft..." });
 
-  await launcher.launch({
-    authorization: {
-      access_token: account.accessToken,
-      client_token: account.uuid,
-      uuid: account.uuid,
-      name: account.username,
-      user_properties: "{}",
-      meta: { type: "mojang", demo: false }
-    } as any,
-    root: sharedMcDir(),
-    version: {
-      number: profile.minecraftVersion,
-      type: "release",
-      custom: profile.loader === "vanilla" ? undefined : versionId
-    },
-    memory: {
-      max: `${ramMb}M`,
-      min: `${Math.max(512, Math.floor(ramMb / 2))}M`
-    },
-    overrides
-  });
+    launcher.on("debug", (e: any) => {
+      log.write("[DEBUG] " + scrub(String(e)) + "\n");
+    });
+    launcher.on("data", (e: any) => {
+      const s = scrub(String(e));
+      log.write(s);
+      lastJavaLine = s.split("\n").filter(Boolean).pop() ?? lastJavaLine;
+      send(win, { stage: "running", message: lastJavaLine.slice(0, 200) });
+    });
+    launcher.on("progress", (e: any) => {
+      if (e?.type) {
+        const pct = e.total ? Math.round((e.task / e.total) * 100) : undefined;
+        send(win, { stage: "assets", message: `${e.type}…`, percent: pct });
+      }
+    });
+    launcher.on("close", (code: number) => {
+      log.write(`\n=== Process Java terminé (code ${code}) ===\n`);
+      log.end();
+      if (code !== 0) {
+        const msg = `Le jeu a quitté avec le code ${code}. Logs : ${logFile()}\nDernière sortie : ${lastJavaLine.slice(0, 400)}`;
+        send(win, { stage: "error", message: msg });
+        rejectExit(new Error(msg));
+      } else {
+        send(win, { stage: "done", message: "Jeu fermé" });
+        resolveExit();
+      }
+    });
+
+    send(win, { stage: "launching", message: "Lancement..." });
+
+    const isModded = profile.loader !== "vanilla";
+    const customArgs = isModded ? loaderJvmArgs(versionId, sharedMcDir()) : [];
+    if (customArgs.length) log.write(`\nJVM args du loader (${customArgs.length}) injectés via customArgs.\n`);
+
+    await launcher.launch({
+      authorization: {
+        access_token: account.accessToken,
+        client_token: account.uuid,
+        uuid: account.uuid,
+        name: account.username,
+        user_properties: "{}",
+        meta: { type: "mojang", demo: false }
+      } as any,
+      root: sharedMcDir(),
+      version: {
+        number: profile.minecraftVersion,
+        type: "release",
+        custom: profile.loader === "vanilla" ? undefined : versionId
+      },
+      memory: {
+        max: `${ramMb}M`,
+        min: `${Math.max(512, Math.floor(ramMb / 2))}M`
+      },
+      javaPath,
+      customArgs,
+      overrides: {
+        gameDirectory: profileDir(profile.id)
+      }
+    });
+  } catch (e: any) {
+    log.write(`\n=== ERREUR ===\n${e?.stack ?? e}\n`);
+    log.end();
+    send(win, { stage: "error", message: String(e?.message ?? e) });
+    throw e;
+  }
+
+  await exitPromise;
 }

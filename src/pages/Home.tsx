@@ -86,13 +86,15 @@ export function Home({ manifest, settings, selectedProfile, setSelectedProfile, 
 
           {progress && (
             <div style={{ marginTop: 16 }}>
-              <div className="muted">{progress.stage} — {progress.message}</div>
+              <div className={progress.stage === "error" ? "danger" : "muted"} style={{ whiteSpace: "pre-wrap" }}>
+                {progress.stage} — {progress.message}
+              </div>
               {typeof progress.percent === "number" && (
                 <div className="progressbar"><span style={{ width: `${progress.percent}%` }} /></div>
               )}
             </div>
           )}
-          {err && <div className="danger" style={{ marginTop: 12 }}>{err}</div>}
+          {err && <div className="danger" style={{ marginTop: 12, whiteSpace: "pre-wrap" }}>{err}</div>}
         </div>
       )}
     </>

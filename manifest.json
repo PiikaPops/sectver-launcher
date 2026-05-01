@@ -22,6 +22,11 @@
           "name": "Cobblemon-neoforge-1.7.3+1.21.1.jar",
           "url": "https://cdn.modrinth.com/data/MdwFAVRL/versions/S1TrAn8c/Cobblemon-neoforge-1.7.3%2B1.21.1.jar",
           "required": true
+        },
+        {
+          "name" : "kotlinforforge-5.11.0.jar",
+          "url" : "https://cdn.modrinth.com/data/ordsPcFz/versions/NrSebcsG/kotlinforforge-5.11.0-all.jar",
+          "required" : true
         }
       ],
       "shaders": [],

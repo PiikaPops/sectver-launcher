@@ -25,7 +25,13 @@ export default function App() {
       setSelectedProfile(prev => prev ?? last ?? null);
     }).catch(e => console.error("manifest", e));
 
-    const offProgress = window.api.on.launchProgress(p => setProgress(p));
+    const offProgress = window.api.on.launchProgress(p => {
+      setProgress(prev => {
+        // Une erreur ne doit pas être écrasée par un event tardif "done".
+        if (prev?.stage === "error" && p.stage === "done") return prev;
+        return p;
+      });
+    });
     const offUpdater = window.api.on.updaterStatus(s => setUpdateInfo(s));
     return () => { offProgress(); offUpdater(); };
   }, []);
