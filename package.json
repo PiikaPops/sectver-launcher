@@ -56,8 +56,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "REPLACE_WITH_YOUR_GH_USER",
-      "repo": "REPLACE_WITH_YOUR_REPO"
+      "owner": "PiikaPops",
+      "repo": "sectver-launcher"
     }
   }
 }

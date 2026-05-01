@@ -4,7 +4,7 @@ import type { RemoteManifest } from "../shared/types";
 
 const MANIFEST_URL =
   process.env.SECTVER_MANIFEST_URL ??
-  "https://raw.githubusercontent.com/REPLACE_WITH_YOUR_GH_USER/REPLACE_WITH_YOUR_REPO/main/manifest.json";
+  "https://raw.githubusercontent.com/PiikaPops/sectver-launcher/main/manifest.json";
 
 export async function fetchManifest(): Promise<RemoteManifest> {
   try {
