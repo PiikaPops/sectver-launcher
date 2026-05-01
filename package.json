@@ -1,0 +1,63 @@
+{
+  "name": "sectver-launcher",
+  "version": "0.1.0",
+  "description": "Sectver Minecraft Launcher",
+  "main": "dist-electron/main.js",
+  "author": "Sectver",
+  "private": true,
+  "scripts": {
+    "dev:vite": "vite",
+    "dev:electron": "tsc -p electron/tsconfig.json && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "dev": "concurrently -k -n VITE,ELECTRON -c magenta,cyan \"npm:dev:vite\" \"wait-on http://localhost:5173 && npm:dev:electron\"",
+    "build": "vite build && tsc -p electron/tsconfig.json",
+    "start": "npm run build && electron .",
+    "package": "npm run build && electron-builder",
+    "package:win": "npm run build && electron-builder --win --x64"
+  },
+  "dependencies": {
+    "@xmcl/installer": "^5.4.0",
+    "electron-updater": "^6.3.9",
+    "minecraft-launcher-core": "^3.18.2",
+    "msmc": "^4.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "wait-on": "^8.0.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  },
+  "build": {
+    "appId": "com.sectver.launcher",
+    "productName": "Sectver Launcher",
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "directories": {
+      "buildResources": "resources"
+    },
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "REPLACE_WITH_YOUR_GH_USER",
+      "repo": "REPLACE_WITH_YOUR_REPO"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-05-01T00:00:00Z",
+  "announcement": "Bienvenue sur Sectver !",
+  "profiles": [
+    {
+      "id": "vanilla",
+      "displayName": "Vanilla 26.1.2",
+      "minecraftVersion": "26.1.2",
+      "loader": "vanilla",
+      "defaultRamMb": 4096
+    },
+    {
+      "id": "modded",
+      "displayName": "Sectver Modded",
+      "minecraftVersion": "26.1.2",
+      "loader": "neoforge",
+      "loaderVersion": "latest",
+      "defaultRamMb": 8192,
+      "mods": [
+        {
+          "name": "example-mod.jar",
+          "url": "https://example.com/mods/example-mod-1.0.0.jar",
+          "sha1": "0000000000000000000000000000000000000000",
+          "required": true
+        }
+      ],
+      "shaders": [],
+      "resourcePacks": []
+    }
+  ]
+}
