@@ -6,16 +6,28 @@ import { profileDir, rootDir, sharedMcDir } from "./paths";
 import { ensureLoader } from "./modloaders";
 import { ensureJavaRuntime, readRequiredJavaComponent } from "./java";
 import { syncProfileResources } from "./sync";
+import { replaceMcIcons } from "./mcicon";
+
+const SECTVER_LOGO_PATH = path.join(__dirname, "..", "..", "dist", "logo", "sectver_logo.jpg");
 
 import { IPC } from "../shared/ipc";
 import type { AuthAccount, LaunchProgress, ProfileManifest } from "../shared/types";
 
-/** Retire des chaînes les tokens d'authentification avant écriture sur disque. */
+/**
+ * Retire des chaînes les tokens d'auth avant écriture sur disque. Couvre les
+ * deux formats que MCLC et ModLauncher utilisent :
+ *   --xuid <token>           (ligne de commande générée par MCLC)
+ *   --xuid, <token>, --next  (réimpression "args array" de ModLauncher)
+ */
 function scrub(s: string): string {
-  return s
-    .replace(/(--accessToken\s+)\S+/g, "$1[REDACTED]")
-    .replace(/(--xuid\s+)\S+/g, "$1[REDACTED]")
-    .replace(/(--clientId\s+)\S+/g, "$1[REDACTED]");
+  const flags = ["accessToken", "xuid", "clientId"];
+  let out = s;
+  for (const f of flags) {
+    // Capture le séparateur (espace ou virgule + espace) sans manger la virgule
+    // suivante du tableau, et remplace la valeur seule.
+    out = out.replace(new RegExp(`(--${f})([,\\s]+)([^\\s,]+)`, "g"), "$1$2[REDACTED]");
+  }
+  return out;
 }
 
 /**
@@ -98,7 +110,19 @@ export async function launchProfile(opts: {
     send(win, { stage: "version", message: "Vérification des fichiers Minecraft..." });
 
     launcher.on("debug", (e: any) => {
-      log.write("[DEBUG] " + scrub(String(e)) + "\n");
+      const s = scrub(String(e));
+      log.write("[DEBUG] " + s + "\n");
+      // MCLC vient de télécharger les assets — il a probablement écrasé notre
+      // patch d'icônes. On le ré-applique tout de suite, avant que Java ne lise
+      // les fichiers.
+      if (s.includes("Downloaded assets")) {
+        try {
+          const r = replaceMcIcons(versionId, profile.minecraftVersion, SECTVER_LOGO_PATH);
+          log.write(`[icon post-download] jar=${r.jarPatchedEntries} assets=${r.assetEntriesPatched}\n`);
+        } catch (e2) {
+          log.write(`[icon post-download] erreur : ${String(e2)}\n`);
+        }
+      }
     });
     launcher.on("data", (e: any) => {
       const s = scrub(String(e));
@@ -126,6 +150,22 @@ export async function launchProfile(opts: {
     });
 
     send(win, { stage: "launching", message: "Lancement..." });
+
+    // Patche le JAR vanilla et le store d'assets pour remplacer les icônes
+    // Minecraft par le logo Sectver. À ré-exécuter à chaque lancement.
+    try {
+      const r = replaceMcIcons(versionId, profile.minecraftVersion, SECTVER_LOGO_PATH);
+      log.write(
+        `\n[icon] source=${r.sourceLoaded ? "OK" : "KO"} (${r.sourcePath})` +
+        `\n[icon] JAR ${r.jarFound ? "trouvé" : "absent"} : ${r.jarPath}` +
+        `\n[icon] entrées JAR remplacées : ${r.jarPatchedEntries}` +
+        `\n[icon] assets remplacés : ${r.assetEntriesPatched}` +
+        (r.errors.length ? `\n[icon] erreurs : ${r.errors.join(" | ")}` : "") +
+        "\n"
+      );
+    } catch (e) {
+      log.write(`\n[icon] Remplacement des icônes MC ignoré : ${String(e)}\n`);
+    }
 
     const isModded = profile.loader !== "vanilla";
     const customArgs = isModded ? loaderJvmArgs(versionId, sharedMcDir()) : [];

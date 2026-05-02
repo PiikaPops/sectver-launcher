@@ -2,7 +2,7 @@ export function TitleBar() {
   return (
     <div className="titlebar">
       <div className="titlebar-drag">
-        <span className="titlebar-title">SECTVER LAUNCHER</span>
+        <span className="titlebar-title">SECTΛER LAUNCHER</span>
       </div>
       <div className="titlebar-actions">
         <button className="tb-btn" title="Réduire" onClick={() => window.api.win.minimize()} aria-label="Réduire">

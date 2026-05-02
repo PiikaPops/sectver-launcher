@@ -24,13 +24,14 @@ export function Home({ manifest, settings, progress }: Props) {
   if (!manifest) {
     return (
       <div className="home">
-        <div className="hero-heading">Choisissez votre Sectver !</div>
+        <div className="hero-heading">Choisissez votre SectΛer !</div>
         <div className="muted" style={{ textAlign: "center" }}>Chargement du manifeste…</div>
       </div>
     );
   }
 
   const launch = async (p: ProfileManifest) => {
+    if (busyId) return; // Empêche un second lancement tant qu'un est en cours.
     const ram = settings.ramByProfile[p.id] ?? p.defaultRamMb;
     setBusyId(p.id);
     setErrById(prev => ({ ...prev, [p.id]: null }));
@@ -45,13 +46,14 @@ export function Home({ manifest, settings, progress }: Props) {
 
   return (
     <div className="home">
-      <div className="hero-heading">Choisissez votre Sectver !</div>
+      <div className="hero-heading">Choisissez votre SectΛer !</div>
 
       <div className="profile-panels">
         {manifest.profiles.map(basis => {
           const p = effectiveProfile(basis, settings);
           const ram = settings.ramByProfile[basis.id] ?? basis.defaultRamMb;
           const isBusy = busyId === basis.id;
+          const isLocked = busyId !== null && busyId !== basis.id;
           const showProgress = isBusy && progress;
           const localErr = errById[basis.id];
           const isModded = p.loader !== "vanilla";
@@ -61,6 +63,7 @@ export function Home({ manifest, settings, progress }: Props) {
               profile={p}
               ramMb={ram}
               isBusy={isBusy}
+              isLocked={isLocked}
               progress={showProgress ? progress : null}
               error={localErr}
               isModded={isModded}
@@ -78,6 +81,7 @@ interface PanelProps {
   profile: ProfileManifest;
   ramMb: number;
   isBusy: boolean;
+  isLocked: boolean;
   progress: LaunchProgress | null;
   error: string | null | undefined;
   isModded: boolean;
@@ -85,8 +89,10 @@ interface PanelProps {
   onOpenFolder: () => void;
 }
 
-function ProfilePanel({ profile, ramMb, isBusy, progress, error, isModded, onPlay, onOpenFolder }: PanelProps) {
-  const bgUrl = `./backgrounds/${profile.id}.jpg`;
+function ProfilePanel({ profile, ramMb, isBusy, isLocked, progress, error, isModded, onPlay, onOpenFolder }: PanelProps) {
+  // Résolution absolue depuis l'URL du document — fonctionne en dev (http://)
+  // ET en production (file://) dans le bundle asar.
+  const bgUrl = new URL(`backgrounds/${profile.id}.jpg`, document.baseURI).href;
   return (
     <div
       className="profile-panel"
@@ -126,8 +132,8 @@ function ProfilePanel({ profile, ramMb, isBusy, progress, error, isModded, onPla
         </div>
       )}
 
-      <button className="play-btn" disabled={isBusy} onClick={onPlay}>
-        {isBusy ? "Lancement…" : "Jouer"}
+      <button className="play-btn" disabled={isBusy || isLocked} onClick={onPlay}>
+        {isBusy ? "Lancement…" : isLocked ? "Indisponible" : "Jouer"}
       </button>
 
       <div className="pp-tools">

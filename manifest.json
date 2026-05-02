@@ -1,18 +1,18 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-05-01T00:00:00Z",
-  "announcement": "Bienvenue sur Sectver !",
+  "announcement": "Bienvenue sur SectΛer !",
   "profiles": [
     {
       "id": "vanilla",
-      "displayName": "Sectver Vanilla 26.1.2",
+      "displayName": "SectΛer Vanilla 26.1.2",
       "minecraftVersion": "26.1.2",
       "loader": "vanilla",
       "defaultRamMb": 2048
     },
     {
       "id": "modded",
-      "displayName": "Sectver moddé 1.21.1",
+      "displayName": "SectΛer moddé 1.21.1",
       "minecraftVersion": "1.21.1",
       "loader": "neoforge",
       "loaderVersion": "latest",

@@ -15,7 +15,7 @@ export function Login({ onLogin }: { onLogin: () => Promise<void> }) {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <h1>SECTVER</h1>
+        <h1>SECTΛER</h1>
         <div className="muted" style={{ marginBottom: 24 }}>Launcher Minecraft</div>
         <button className="primary" style={{ width: "100%", padding: "12px" }} disabled={busy} onClick={handleLogin}>
           {busy ? "Connexion…" : "Se connecter avec Microsoft"}

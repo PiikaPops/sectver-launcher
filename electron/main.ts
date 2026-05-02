@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, shell, nativeImage } from "electron";
 import * as path from "path";
 import * as fs from "fs";
 import { IPC } from "../shared/ipc";
@@ -11,12 +11,19 @@ import { checkForUpdates, initUpdater, quitAndInstall } from "./updater";
 
 let win: BrowserWindow | null = null;
 
+function logoPath(): string {
+  // En dev comme en prod : public/logo/sectver_logo.jpg → dist/logo/sectver_logo.jpg
+  return path.join(__dirname, "..", "..", "dist", "logo", "sectver_logo.jpg");
+}
+
 function createWindow() {
+  const icon = nativeImage.createFromPath(logoPath());
   win = new BrowserWindow({
     width: 1180,
     height: 740,
     backgroundColor: "#050202",
-    title: "Sectver Launcher",
+    title: "SectΛer Launcher",
+    icon: icon.isEmpty() ? undefined : icon,
     autoHideMenuBar: true,
     frame: false,
     titleBarStyle: "hidden",

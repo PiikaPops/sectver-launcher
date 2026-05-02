@@ -7,8 +7,14 @@ const MANIFEST_URL =
   "https://raw.githubusercontent.com/PiikaPops/sectver-launcher/main/manifest.json";
 
 export async function fetchManifest(): Promise<RemoteManifest> {
+  // Cache-buster : `raw.githubusercontent.com` est servi via CDN (TTL ~5 min).
+  // Un query-param aléatoire force une réponse fraîche.
+  const url = `${MANIFEST_URL}?t=${Date.now()}`;
   try {
-    const r = await fetch(MANIFEST_URL, { cache: "no-store" });
+    const r = await fetch(url, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache", "Pragma": "no-cache" }
+    });
     if (!r.ok) throw new Error("HTTP " + r.status);
     const json = (await r.json()) as RemoteManifest;
     fs.writeFileSync(manifestCacheFile(), JSON.stringify(json, null, 2));
