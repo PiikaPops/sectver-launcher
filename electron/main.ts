@@ -15,11 +15,14 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1180,
     height: 740,
-    minWidth: 980,
-    minHeight: 620,
-    backgroundColor: "#0e0404",
+    backgroundColor: "#050202",
     title: "Sectver Launcher",
     autoHideMenuBar: true,
+    frame: false,
+    titleBarStyle: "hidden",
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -36,6 +39,8 @@ function createWindow() {
   }
 
   win.on("closed", () => (win = null));
+  win.on("maximize", () => win?.webContents.send(IPC.EvtWinState, { maximized: true }));
+  win.on("unmaximize", () => win?.webContents.send(IPC.EvtWinState, { maximized: false }));
 }
 
 app.whenReady().then(() => {
@@ -67,8 +72,23 @@ ipcMain.handle(IPC.ProfileLaunch, async (_e, { profileId, ramMb }: { profileId: 
   const account = await getCurrent();
   if (!account) throw new Error("Non connecté");
   const manifest = await fetchManifest();
-  const profile = manifest.profiles.find(p => p.id === profileId);
-  if (!profile) throw new Error("Profil introuvable");
+  const base = manifest.profiles.find(p => p.id === profileId);
+  if (!base) throw new Error("Profil introuvable");
+
+  // Override utilisateur du loader : on conserve la version MC du manifeste,
+  // seul le loader change (c'est à l'admin de garantir que le loader existe
+  // pour cette version MC).
+  const settings = loadSettings();
+  const override = settings.loaderByProfile?.[profileId];
+  let profile = base;
+  if (override && override !== base.loader) {
+    profile = {
+      ...base,
+      loader: override,
+      loaderVersion: override === "vanilla" ? undefined : "latest"
+    };
+  }
+
   await launchProfile({ profile, account, ramMb, win });
   return true;
 });
@@ -116,3 +136,12 @@ ipcMain.handle(IPC.ProfileRemoveLocalMod, (_e, { profileId, name }: { profileId:
 
 ipcMain.handle(IPC.UpdaterCheck, () => checkForUpdates());
 ipcMain.handle(IPC.UpdaterInstall, () => { quitAndInstall(); return true; });
+
+ipcMain.handle(IPC.WinMinimize, () => { win?.minimize(); });
+ipcMain.handle(IPC.WinToggleMax, () => {
+  if (!win) return false;
+  if (win.isMaximized()) win.unmaximize(); else win.maximize();
+  return win.isMaximized();
+});
+ipcMain.handle(IPC.WinClose, () => { win?.close(); });
+ipcMain.handle(IPC.WinIsMax, () => win?.isMaximized() ?? false);

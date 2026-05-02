@@ -27,6 +27,12 @@ const api = {
     check: () => ipcRenderer.invoke(IPC.UpdaterCheck),
     install: () => ipcRenderer.invoke(IPC.UpdaterInstall)
   },
+  win: {
+    minimize: () => ipcRenderer.invoke(IPC.WinMinimize),
+    toggleMax: () => ipcRenderer.invoke(IPC.WinToggleMax),
+    close: () => ipcRenderer.invoke(IPC.WinClose),
+    isMax: () => ipcRenderer.invoke(IPC.WinIsMax)
+  },
   on: {
     launchProgress: (cb: (p: any) => void) => {
       const fn = (_: any, p: any) => cb(p);
@@ -37,6 +43,11 @@ const api = {
       const fn = (_: any, p: any) => cb(p);
       ipcRenderer.on(IPC.EvtUpdaterStatus, fn);
       return () => ipcRenderer.removeListener(IPC.EvtUpdaterStatus, fn);
+    },
+    winState: (cb: (p: { maximized: boolean }) => void) => {
+      const fn = (_: any, p: any) => cb(p);
+      ipcRenderer.on(IPC.EvtWinState, fn);
+      return () => ipcRenderer.removeListener(IPC.EvtWinState, fn);
     }
   }
 };

@@ -19,6 +19,12 @@ export const IPC = {
   UpdaterCheck: "updater:check",
   UpdaterInstall: "updater:install",
 
+  WinMinimize: "win:minimize",
+  WinToggleMax: "win:toggleMax",
+  WinClose: "win:close",
+  WinIsMax: "win:isMax",
+
   EvtLaunchProgress: "evt:launch:progress",
-  EvtUpdaterStatus: "evt:updater:status"
+  EvtUpdaterStatus: "evt:updater:status",
+  EvtWinState: "evt:win:state"
 } as const;

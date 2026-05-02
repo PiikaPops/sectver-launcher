@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { LaunchProgress, RemoteManifest, UserSettings } from "../../shared/types";
+import type { LaunchProgress, RemoteManifest, ProfileManifest, UserSettings } from "../../shared/types";
 
 interface Props {
   manifest: RemoteManifest | null;
@@ -10,93 +10,129 @@ interface Props {
   progress: LaunchProgress | null;
 }
 
-export function Home({ manifest, settings, selectedProfile, setSelectedProfile, updateSettings, progress }: Props) {
-  const [launching, setLaunching] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+/** Applique le choix de loader utilisateur sur un profil de base (MC version inchangée). */
+function effectiveProfile(p: ProfileManifest, settings: UserSettings): ProfileManifest {
+  const override = settings.loaderByProfile?.[p.id];
+  if (!override || override === p.loader) return p;
+  return { ...p, loader: override };
+}
 
-  if (!manifest) return <div className="muted">Chargement du manifeste…</div>;
+export function Home({ manifest, settings, progress }: Props) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [errById, setErrById] = useState<Record<string, string | null>>({});
 
-  const profile = manifest.profiles.find(p => p.id === selectedProfile) ?? null;
-  const ram = profile ? (settings.ramByProfile[profile.id] ?? profile.defaultRamMb) : 4096;
+  if (!manifest) {
+    return (
+      <div className="home">
+        <div className="hero-heading">Choisissez votre Sectver !</div>
+        <div className="muted" style={{ textAlign: "center" }}>Chargement du manifeste…</div>
+      </div>
+    );
+  }
 
-  const onRamChange = async (v: number) => {
-    if (!profile) return;
-    await updateSettings({
-      ...settings,
-      ramByProfile: { ...settings.ramByProfile, [profile.id]: v }
-    });
-  };
-
-  const launch = async () => {
-    if (!profile) return;
-    setErr(null);
-    setLaunching(true);
+  const launch = async (p: ProfileManifest) => {
+    const ram = settings.ramByProfile[p.id] ?? p.defaultRamMb;
+    setBusyId(p.id);
+    setErrById(prev => ({ ...prev, [p.id]: null }));
     try {
-      await window.api.profile.launch(profile.id, ram);
+      await window.api.profile.launch(p.id, ram);
     } catch (e: any) {
-      setErr(e?.message ?? String(e));
+      setErrById(prev => ({ ...prev, [p.id]: e?.message ?? String(e) }));
     } finally {
-      setLaunching(false);
+      setBusyId(null);
     }
   };
 
   return (
-    <>
-      <h1 className="title">Bienvenue</h1>
-      {manifest.announcement && <div className="card">{manifest.announcement}</div>}
+    <div className="home">
+      <div className="hero-heading">Choisissez votre Sectver !</div>
 
-      <div className="subtitle">Choisissez votre version</div>
-      <div className="profile-grid">
-        {manifest.profiles.map(p => (
-          <div
-            key={p.id}
-            className={`profile-card ${selectedProfile === p.id ? "selected" : ""}`}
-            onClick={() => setSelectedProfile(p.id)}
-          >
-            <div className="spread" style={{ marginBottom: 10 }}>
-              <strong style={{ fontSize: 16 }}>{p.displayName}</strong>
-              <span className="tag">{p.loader}</span>
-            </div>
-            <div className="muted">Minecraft {p.minecraftVersion}</div>
-            {p.mods?.length ? <div className="muted" style={{ marginTop: 6 }}>{p.mods.length} mods</div> : null}
-          </div>
-        ))}
+      <div className="profile-panels">
+        {manifest.profiles.map(basis => {
+          const p = effectiveProfile(basis, settings);
+          const ram = settings.ramByProfile[basis.id] ?? basis.defaultRamMb;
+          const isBusy = busyId === basis.id;
+          const showProgress = isBusy && progress;
+          const localErr = errById[basis.id];
+          const isModded = p.loader !== "vanilla";
+          return (
+            <ProfilePanel
+              key={basis.id}
+              profile={p}
+              ramMb={ram}
+              isBusy={isBusy}
+              progress={showProgress ? progress : null}
+              error={localErr}
+              isModded={isModded}
+              onPlay={() => launch(p)}
+              onOpenFolder={() => window.api.profile.openFolder(basis.id)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface PanelProps {
+  profile: ProfileManifest;
+  ramMb: number;
+  isBusy: boolean;
+  progress: LaunchProgress | null;
+  error: string | null | undefined;
+  isModded: boolean;
+  onPlay: () => void;
+  onOpenFolder: () => void;
+}
+
+function ProfilePanel({ profile, ramMb, isBusy, progress, error, isModded, onPlay, onOpenFolder }: PanelProps) {
+  const bgUrl = `./backgrounds/${profile.id}.jpg`;
+  return (
+    <div
+      className="profile-panel"
+      style={{ ["--profile-bg" as any]: `url("${bgUrl}")` }}
+    >
+      <div className="pp-bg" />
+      <div className="pp-head">
+        <div>
+          <div className="pp-name">{profile.displayName}</div>
+          <span className="pp-mc">Minecraft {profile.minecraftVersion}</span>
+        </div>
+        <span className={`tag ${isModded ? "" : "gold"}`}>{profile.loader}</span>
       </div>
 
-      {profile && (
-        <div className="card" style={{ marginTop: 22 }}>
-          <div className="spread" style={{ marginBottom: 14 }}>
-            <strong>Mémoire allouée : {ram} Mo</strong>
-            <span className="muted">Min 1024 — Max 16384</span>
-          </div>
-          <input
-            type="range" min={1024} max={16384} step={512}
-            value={ram}
-            onChange={e => onRamChange(parseInt(e.target.value, 10))}
-          />
+      <div className="pp-stats">
+        <span className="pp-stat">RAM : <strong>{(ramMb / 1024).toFixed(1)} Go</strong></span>
+        {profile.mods?.length ? (
+          <span className="pp-stat"><strong>{profile.mods.length}</strong> mods</span>
+        ) : null}
+        {profile.shaders?.length ? (
+          <span className="pp-stat"><strong>{profile.shaders.length}</strong> shaders</span>
+        ) : null}
+      </div>
 
-          <div style={{ marginTop: 18 }} className="row">
-            <button className="primary" disabled={launching} onClick={launch} style={{ padding: "12px 22px", fontSize: 15 }}>
-              {launching ? "Lancement…" : `Lancer ${profile.displayName}`}
-            </button>
-            <button onClick={() => window.api.profile.openFolder(profile.id)}>
-              Ouvrir le dossier
-            </button>
-          </div>
+      <div className="pp-spacer" />
 
-          {progress && (
-            <div style={{ marginTop: 16 }}>
-              <div className={progress.stage === "error" ? "danger" : "muted"} style={{ whiteSpace: "pre-wrap" }}>
-                {progress.stage} — {progress.message}
-              </div>
-              {typeof progress.percent === "number" && (
-                <div className="progressbar"><span style={{ width: `${progress.percent}%` }} /></div>
-              )}
-            </div>
+      {(progress || error) && (
+        <div className={`pp-progress ${progress?.stage === "error" || error ? "error" : ""}`}>
+          {error
+            ? error
+            : progress
+              ? `${progress.stage} — ${progress.message}`
+              : ""}
+          {progress && typeof progress.percent === "number" && (
+            <div className="progressbar"><span style={{ width: `${progress.percent}%` }} /></div>
           )}
-          {err && <div className="danger" style={{ marginTop: 12, whiteSpace: "pre-wrap" }}>{err}</div>}
         </div>
       )}
-    </>
+
+      <button className="play-btn" disabled={isBusy} onClick={onPlay}>
+        {isBusy ? "Lancement…" : "Jouer"}
+      </button>
+
+      <div className="pp-tools">
+        <button onClick={onOpenFolder}>Ouvrir le dossier</button>
+      </div>
+    </div>
   );
 }

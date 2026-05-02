@@ -4,6 +4,7 @@ import { Login } from "./pages/Login";
 import { Home } from "./pages/Home";
 import { Mods } from "./pages/Mods";
 import { Settings } from "./pages/Settings";
+import { TitleBar } from "./components/TitleBar";
 
 type Page = "home" | "mods" | "settings";
 
@@ -41,10 +42,15 @@ export default function App() {
   }, [manifest, selectedProfile]);
 
   if (!account) {
-    return <Login onLogin={async () => {
-      const a = await window.api.auth.login();
-      setAccount(a as AuthAccount);
-    }} />;
+    return (
+      <div className="app-shell">
+        <TitleBar />
+        <Login onLogin={async () => {
+          const a = await window.api.auth.login();
+          setAccount(a as AuthAccount);
+        }} />
+      </div>
+    );
   }
 
   const updateSettings = async (next: UserSettings) => {
@@ -53,17 +59,30 @@ export default function App() {
   };
 
   return (
-    <div className="app">
+    <div className="app-shell">
+      <TitleBar />
+      <div className="app">
       <aside className="sidebar">
-        <div className="brand">SECTVER</div>
         <button className={`nav-btn ${page === "home" ? "active" : ""}`} onClick={() => setPage("home")}>Accueil</button>
         <button className={`nav-btn ${page === "mods" ? "active" : ""}`} onClick={() => setPage("mods")}>Mods & Packs</button>
         <button className={`nav-btn ${page === "settings" ? "active" : ""}`} onClick={() => setPage("settings")}>Paramètres</button>
         <div style={{ flex: 1 }} />
-        <div className="muted" style={{ padding: "8px 10px" }}>
-          Connecté en tant que <strong style={{ color: "var(--text)" }}>{account.username}</strong>
+        <div className="user-card">
+          <img
+            src={`https://mc-heads.net/avatar/${account.uuid}/32`}
+            alt=""
+            width={32}
+            height={32}
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+          <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+            <span className="ulabel">Connecté</span>
+            <span className="uname" title={account.username} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {account.username}
+            </span>
+          </div>
         </div>
-        <button className="nav-btn" onClick={async () => { await window.api.auth.logout(); setAccount(null); }}>
+        <button className="nav-btn" style={{ marginTop: 8 }} onClick={async () => { await window.api.auth.logout(); setAccount(null); }}>
           Se déconnecter
         </button>
       </aside>
@@ -80,7 +99,13 @@ export default function App() {
           />
         )}
         {page === "mods" && manifest && selectedProfile && (
-          <Mods manifest={manifest} profileId={selectedProfile} setProfileId={setSelectedProfile} />
+          <Mods
+            manifest={manifest}
+            profileId={selectedProfile}
+            setProfileId={setSelectedProfile}
+            settings={settings}
+            updateSettings={updateSettings}
+          />
         )}
         {page === "settings" && (
           <Settings
@@ -92,6 +117,7 @@ export default function App() {
         )}
       </main>
 
+      </div>
       {updateInfo && (updateInfo.status === "available" || updateInfo.status === "downloaded") && (
         <div className="toast">
           <div style={{ fontWeight: 700, marginBottom: 6 }}>

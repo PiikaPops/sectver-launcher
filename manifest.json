@@ -5,14 +5,14 @@
   "profiles": [
     {
       "id": "vanilla",
-      "displayName": "Vanilla 26.1.2",
+      "displayName": "Sectver Vanilla 26.1.2",
       "minecraftVersion": "26.1.2",
       "loader": "vanilla",
       "defaultRamMb": 2048
     },
     {
       "id": "modded",
-      "displayName": "Sectver Modded — Cobblemon",
+      "displayName": "Sectver moddé 1.21.1",
       "minecraftVersion": "1.21.1",
       "loader": "neoforge",
       "loaderVersion": "latest",

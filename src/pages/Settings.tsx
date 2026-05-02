@@ -56,9 +56,6 @@ export function Settings({ manifest, settings, updateSettings, updateInfo }: Pro
         </div>
       </div>
 
-      <div className="card muted" style={{ fontSize: 12 }}>
-        Sectver Launcher — les versions Minecraft, le loader et la liste de mods sont contrôlés à distance par les administrateurs via le manifeste GitHub.
-      </div>
     </>
   );
 }

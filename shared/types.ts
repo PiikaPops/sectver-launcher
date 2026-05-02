@@ -34,6 +34,8 @@ export interface RemoteManifest {
 
 export interface UserSettings {
   ramByProfile: Record<string, number>;
+  /** Permet à l'utilisateur d'overrider le loader d'un profil (ex: passer "vanilla" en fabric). */
+  loaderByProfile?: Record<string, Loader>;
   lastProfileId?: string;
 }
 
